@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Globe, ExternalLink, Edit3, Copy, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, Globe, ExternalLink, Edit3, Copy, Check, FileText, Download } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -48,7 +48,10 @@ const translations = {
     status_failed: "Failed",
     status_pending: "Wait",
     settingsSaved: "Saved!",
-    connectionTip: "Use NAS IP for RPC."
+    connectionTip: "Use NAS IP for RPC.",
+    copyAll: "Copy All Magnets",
+    exportTxt: "Export .txt",
+    copied: "All copied!"
   },
   cn: {
     title: "动漫花园",
@@ -92,7 +95,10 @@ const translations = {
     status_failed: "失败",
     status_pending: "等待",
     settingsSaved: "已保存！",
-    connectionTip: "提示：无法连接请检查 IP。"
+    connectionTip: "提示：无法连接请检查 IP。",
+    copyAll: "复制全部磁力链",
+    exportTxt: "导出为 .txt",
+    copied: "已复制到剪贴板"
   },
   jp: {
     title: "アニメガーデン",
@@ -136,7 +142,10 @@ const translations = {
     status_failed: "失敗",
     status_pending: "保留",
     settingsSaved: "保存完了！",
-    connectionTip: "IPを確認してください。"
+    connectionTip: "IPを確認してください。",
+    copyAll: "全コピー",
+    exportTxt: ".txt出力",
+    copied: "コピーしました"
   }
 };
 
@@ -164,6 +173,7 @@ function App() {
   const [newSub, setNewSub] = useState({ name: '', url: '', download_history: false, keywords: '' });
   const [editSettings, setEditSettings] = useState({ aria2_rpc_url: '', aria2_rpc_secret: '' });
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [isBatchCopied, setIsBatchCopied] = useState(false);
 
   const t = translations[lang];
   useEffect(() => { localStorage.setItem('lang', lang); }, [lang]);
@@ -192,10 +202,26 @@ function App() {
     } catch (e) { return `http://${window.location.hostname}:6880`; }
   };
 
-  const copyToClipboard = (text: string, id: number) => {
+  const copyToClipboard = (text: string, id: number | string) => {
     navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (typeof id === 'number') {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } else {
+      setIsBatchCopied(true);
+      setTimeout(() => setIsBatchCopied(false), 2000);
+    }
+  };
+
+  const exportAsTxt = () => {
+    if (!historyList) return;
+    const content = historyList.map((item: any) => item.magnet_link).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `anime_magnets_${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
   };
 
   return (
@@ -257,6 +283,20 @@ function App() {
           <>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">{t.history}</h2>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => copyToClipboard(historyList?.map((i:any) => i.magnet_link).join('\n') || '', 'batch')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all shadow-sm ${isBatchCopied ? 'bg-green-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  {isBatchCopied ? <Check size={14}/> : <Copy size={14}/>} {isBatchCopied ? t.copied : t.copyAll}
+                </button>
+                <button 
+                  onClick={exportAsTxt}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] shadow-sm transition-all"
+                >
+                  <FileText size={14}/> {t.exportTxt}
+                </button>
+              </div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="divide-y divide-slate-100">
@@ -308,7 +348,7 @@ function App() {
                 </div>
               </div>
               <div className="bg-slate-100 p-6 rounded-xl border border-slate-200 flex flex-col justify-between">
-                <div><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">System</h3><p className="text-slate-600 text-xs leading-relaxed font-medium italic">High-performance Tracker v1.5</p></div>
+                <div><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">System</h3><p className="text-slate-600 text-xs leading-relaxed font-medium italic">RSS Monitoring Engine</p></div>
                 <div className="pt-4 border-t border-slate-200/50 flex justify-between items-center font-mono text-[9px] text-slate-400 uppercase tracking-widest"><span>Node Status</span><span className="text-green-500 font-bold">Online</span></div>
               </div>
             </div>
