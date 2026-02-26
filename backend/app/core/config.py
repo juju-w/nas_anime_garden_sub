@@ -2,7 +2,7 @@ import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "NAS Anime Garden Subscription"
+    PROJECT_NAME: str = "动漫花园RSS订阅工具"
     API_V1_STR: str = "/api/v1"
     
     # SQLite Database

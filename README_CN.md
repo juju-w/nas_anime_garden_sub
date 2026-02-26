@@ -1,4 +1,4 @@
-# NAS 动漫花园订阅工具 (NAS Anime Garden Tracker)
+# 动漫花园RSS订阅工具 (Anime Garden RSS Subscription Tool)
 
 [English](./README.md) | 中文说明
 

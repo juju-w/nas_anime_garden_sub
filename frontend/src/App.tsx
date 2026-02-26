@@ -7,7 +7,7 @@ const API_BASE = 'http://localhost:8000/api/v1';
 
 const translations = {
   en: {
-    title: "Anime Garden",
+    title: "Anime Garden RSS",
     dashboard: "Trackers",
     history: "Download History",
     settings: "Settings",
@@ -51,7 +51,7 @@ const translations = {
     connectionTip: "Note: Use your NAS IP if localhost fails in browser."
   },
   cn: {
-    title: "动漫花园",
+    title: "动漫花园RSS订阅工具",
     dashboard: "订阅列表",
     history: "下载历史",
     settings: "系统设置",
@@ -95,7 +95,7 @@ const translations = {
     connectionTip: "提示：如果在浏览器中无法连接，请尝试改用 NAS 的实际 IP。"
   },
   jp: {
-    title: "アニメガーデン",
+    title: "アニメガーデンRSS登録",
     dashboard: "トラッカー",
     history: "ダウンロード履歴",
     settings: "システム設定",

@@ -6,7 +6,7 @@ from app.db.init_db import init_db
 from app.tasks.scheduler import task_scheduler
 import os
 
-app = FastAPI(title="NAS Anime Garden Subscription API")
+app = FastAPI(title="动漫花园RSS订阅工具 API")
 
 # Configure CORS
 app.add_middleware(
