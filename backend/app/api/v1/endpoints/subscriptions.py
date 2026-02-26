@@ -19,6 +19,8 @@ def get_db():
 async def run_sync(sub_id: int):
     db = SessionLocal()
     try:
+        # Use joinedload to ensure filters are loaded if needed, 
+        # but simple query is fine if relationship is configured
         sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
         if sub and sub.is_active:
             await scraper.fetch_and_process(db, sub)
@@ -28,6 +30,9 @@ async def run_sync(sub_id: int):
 class FilterBase(BaseModel):
     keyword: str
     type: str
+    
+    class Config:
+        from_attributes = True
 
 class SubscriptionCreate(BaseModel):
     name: str
@@ -49,12 +54,14 @@ class SubscriptionResponse(BaseModel):
     is_active: bool
     download_history: bool
     last_checked_at: Optional[datetime]
+    filters: List[FilterBase] = [] # Added filters to response
     
     class Config:
         from_attributes = True
 
 @router.get("/", response_model=List[SubscriptionResponse])
 def read_subscriptions(db: Session = Depends(get_db)) -> Any:
+    # SQLAlchemy will automatically populate 'filters' based on relationship
     return db.query(Subscription).all()
 
 @router.post("/", response_model=SubscriptionResponse)
@@ -93,8 +100,6 @@ async def update_subscription(
         raise HTTPException(status_code=404, detail="Subscription not found")
     
     update_data = sub_in.model_dump(exclude_unset=True)
-    
-    # Track critical changes to trigger sync
     trigger_sync = False
     was_inactive = not db_sub.is_active
     
@@ -103,18 +108,15 @@ async def update_subscription(
     if "url" in update_data and update_data["url"] != db_sub.url:
         trigger_sync = True
     
-    # Correctly handle filters list from Pydantic model
+    # Handle filters update
     if "filters" in update_data:
         trigger_sync = True
         db.query(Filter).filter(Filter.subscription_id == sub_id).delete()
-        # update_data["filters"] is a list of FilterBase models or dicts depending on dump mode
-        # Using sub_in.filters directly is safer as it's the model list
         if sub_in.filters is not None:
             for f in sub_in.filters:
                 db_filter = Filter(subscription_id=sub_id, keyword=f.keyword, type=f.type)
                 db.add(db_filter)
     
-    # Update other fields
     for field in ["name", "url", "is_active", "download_history"]:
         if field in update_data:
             setattr(db_sub, field, update_data[field])
