@@ -1,5 +1,7 @@
 # NAS Anime Garden Subscription Tool
 
+English | [中文说明](./README_CN.md)
+
 A powerful, lightweight web-based tool for NAS environments to automate anime downloads from `animes.garden` RSS feeds. It monitors feeds, filters by keywords (e.g., "简繁内封"), and automatically submits magnet links to Aria2.
 
 ## Key Features
