@@ -16,6 +16,19 @@
 - **现代 Web UI**：基于 React、Tailwind CSS 和 Lucide 图标构建的简洁仪表盘。
 - **Docker 化部署**：支持 `docker-compose` 一键启动。
 
+## 界面预览
+
+> 请将你的截图放置在 `docs/images/` 目录下。
+
+![控制面板](./docs/images/dashboard.png)
+*直观的订阅任务管理，支持滑动开关即时启停。*
+
+![下载历史](./docs/images/history.png)
+*现代化的卡片式下载历史记录，任务状态一目了然。*
+
+![系统设置](./docs/images/settings.png)
+*灵活的 Aria2 RPC 配置，支持免密一键跳转 AriaNg 监控面板。*
+
 ## 技术栈
 
 - **前端**：React (TypeScript), Tailwind CSS, TanStack Query。
@@ -42,6 +55,17 @@
    docker-compose up -d
    ```
 4. 通过浏览器访问 Web 界面：`http://<你的-NAS-IP>:8000`。
+
+### 使用已有的下载器 (外部 Aria2)
+
+如果你不想使用配套部署的 Aria2 容器，而是想使用 NAS 上**已有的 Aria2 实例**，请按以下步骤配置：
+
+1. 在 `docker-compose.yml` 中，你可以删除 `aria2` 和 `ariang` 服务块，仅保留 `app`。
+2. 启动 `app` 容器并访问 Web 界面（`http://<你的-NAS-IP>:8000`）。
+3. 进入右上角的 **“系统设置 (Settings)”**。
+4. 在 **“RPC 地址”** 中填入你已有 Aria2 的地址，例如：`http://192.168.1.100:6800/jsonrpc`。
+5. 在 **“RPC 密钥”** 中填入你已有 Aria2 的 Secret Token。
+6. 点击 **保存**，后端会立即使用你的独立下载器。
 
 ### 性能优化建议
 

@@ -16,6 +16,19 @@ A powerful, lightweight web-based tool for NAS environments to automate anime do
 - **Modern Web UI**: Responsive dashboard built with React, Tailwind CSS, and Lucide icons.
 - **Dockerized Deployment**: Ready to run with a single `docker-compose` command.
 
+## Screenshots
+
+> Please place your screenshots in the `docs/images/` directory.
+
+![Dashboard](./docs/images/dashboard.png)
+*Intuitive subscription management with real-time toggles.*
+
+![History](./docs/images/history.png)
+*Modern, card-based download history with status indicators.*
+
+![Settings](./docs/images/settings.png)
+*Flexible Aria2 RPC configuration with 1-click AriaNg access.*
+
 ## Tech Stack
 
 - **Frontend**: React (TypeScript), Tailwind CSS, TanStack Query.
@@ -38,6 +51,17 @@ A powerful, lightweight web-based tool for NAS environments to automate anime do
    docker-compose up -d
    ```
 4. Access the Web UI at `http://<your-nas-ip>:8000`.
+
+### Using an External Downloader (Aria2)
+
+If you prefer to use an **existing Aria2 instance** on your NAS instead of the bundled container, follow these steps:
+
+1. In `docker-compose.yml`, remove the `aria2` and `ariang` service blocks, keeping only the `app` service.
+2. Start the `app` container and access the Web UI (`http://<your-nas-ip>:8000`).
+3. Navigate to **"Settings"** in the top right.
+4. Enter your existing Aria2 address in the **"RPC Endpoint"** field (e.g., `http://192.168.1.100:6800/jsonrpc`).
+5. Enter your existing Aria2 secret in the **"RPC Secret Token"** field.
+6. Click **"Save Configuration"**. The backend will instantly switch to your external downloader.
 
 ### Usage Tips
 
