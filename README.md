@@ -2,39 +2,35 @@
 
 English | [中文说明](./README_CN.md)
 
-A powerful, lightweight web-based tool for NAS environments to automate anime downloads from `animes.garden` RSS feeds. It monitors feeds, filters by keywords (e.g., "简繁内封"), and automatically submits magnet links to Aria2.
+A powerful, lightweight web-based tool for NAS environments to automate anime downloads from `animes.garden` RSS feeds. It monitors feeds, filters by keywords, and automatically submits magnet links to Aria2 or exports them for other downloaders.
 
 ## Key Features
 
-- **Smart Subscription Manager**: Add anime RSS feeds with custom tracking rules.
-- **Advanced Keyword Filtering**: Include or exclude episodes based on resolution, language, or fansub group (e.g., `简繁内封`, `1080P`).
-- **Flexible Sync Modes**: 
-  - **Archive Mode**: Download all matching historical episodes from the current feed.
-  - **Monitor Mode**: Only track and download future releases.
-- **Aria2 Integration**: Seamless connection via JSON-RPC.
-- **Automatic Background Tracking**: Periodically checks for updates every 10 minutes.
-- **Modern Web UI**: Responsive dashboard built with React, Tailwind CSS, and Lucide icons.
-- **Dockerized Deployment**: Ready to run with a single `docker-compose` command.
+- **🚀 Minimalist UI**: Clean Apple-style design with support for English, Chinese, and Japanese (persisted in local storage).
+- **⚙️ Smart Task Management**: Real-time sliding toggles to enable/disable tasks. Edit any subscription (title, URL, keywords) anytime.
+- **🔍 Advanced Keyword Filtering**: Precisely target episodes using inclusion keywords (e.g., `1080P`, `简繁内封`).
+- **⚡ Instant Sync**: No waiting—adding, editing, or enabling a tracker triggers an immediate background RSS sync.
+- **📥 Flexible Sync Modes**:
+  - **Archive Mode**: Downloads all matching historical episodes from the current feed.
+  - **Monitor Mode**: Tracks future releases only, preventing redundant downloads.
+- **🔗 Multiple Downloader Support**:
+  - **Aria2 Integration**: Automatic task submission via JSON-RPC. Includes a 1-click autoconnect link to the AriaNg console.
+  - **Bulk Export**: Copy all magnet links or export them as a `.txt` file—perfect for Xunlei, Znas, and others.
+- **🛠️ Performance & Reliability**:
+  - **High Performance**: Optimized with settings caching, connection pooling, and threaded RSS parsing for buttery-smooth responsiveness.
+  - **Data Persistence**: Volumes map database and config files to your host, ensuring updates don't wipe your data.
+  - **Aria2 Tuning**: Pre-configured with auto-updated Tracker lists and optimized BT/PT settings for max speed.
 
 ## Screenshots
 
-> Please place your screenshots in the `docs/images/` directory.
-
 ![Dashboard](./docs/images/dashboard.png)
-*Intuitive subscription management with real-time toggles.*
+*Modern task dashboard with sliding toggles and deep editing.*
 
 ![History](./docs/images/history.png)
-*Modern, card-based download history with status indicators.*
+*Compact history view with bulk actions and status indicators.*
 
 ![Settings](./docs/images/settings.png)
-*Flexible Aria2 RPC configuration with 1-click AriaNg access.*
-
-## Tech Stack
-
-- **Frontend**: React (TypeScript), Tailwind CSS, TanStack Query.
-- **Backend**: FastAPI (Python), SQLAlchemy, APScheduler.
-- **Database**: SQLite (Portable and lightweight).
-- **Downloader**: Aria2 (via RPC).
+*Simplified settings panel with autoconnecting monitor console.*
 
 ## Getting Started
 
@@ -45,29 +41,20 @@ A powerful, lightweight web-based tool for NAS environments to automate anime do
 ### Deployment
 
 1. Clone the repository to your NAS.
-2. Review `docker-compose.yml` and set your `ARIA2_RPC_SECRET`.
+2. Edit `docker-compose.yml` and set your `ARIA2_RPC_SECRET`.
 3. Start the stack:
    ```bash
-   docker-compose up -d
+   docker-compose up -d --build
    ```
 4. Access the Web UI at `http://<your-nas-ip>:8000`.
 
-### Using an External Downloader (Aria2)
+## Using an External Downloader
 
-If you prefer to use an **existing Aria2 instance** on your NAS instead of the bundled container, follow these steps:
+If you prefer to use an existing Aria2 instance on your NAS, simply go to **"Settings"**, update the RPC Endpoint (e.g., `http://192.168.1.100:6800/jsonrpc`), and save. The tool will instantly switch to your external downloader.
 
-1. In `docker-compose.yml`, remove the `aria2` and `ariang` service blocks, keeping only the `app` service.
-2. Start the `app` container and access the Web UI (`http://<your-nas-ip>:8000`).
-3. Navigate to **"Settings"** in the top right.
-4. Enter your existing Aria2 address in the **"RPC Endpoint"** field (e.g., `http://192.168.1.100:6800/jsonrpc`).
-5. Enter your existing Aria2 secret in the **"RPC Secret Token"** field.
-6. Click **"Save Configuration"**. The backend will instantly switch to your external downloader.
+## Performance Tips
 
-### Usage Tips
-
-- **Adding a tracker**: Use URLs from `animes.garden` (e.g., `https://api.animes.garden/feed.xml?subject=515759`).
-- **Keywords**: Use commas to separate multiple inclusion keywords (e.g., `简繁内封, 1080P`).
-- **Initial Sync**: If you want to download episodes already in the feed, check "Download historical episodes" when adding the tracker.
+To get the best download speeds, we recommend forwarding port `51413` (TCP/UDP) on your router to your NAS IP. The tool automatically maintains a fresh Tracker list to keep your connections healthy.
 
 ## License
 
