@@ -58,7 +58,7 @@ const translations = {
     engineVersion: "Engine Version",
     nodeStatus: "Node Status",
     online: "Online",
-    error: "Error: Could not save."
+    error: "Save failed: "
   },
   cn: {
     title: "动漫花园",
@@ -66,7 +66,7 @@ const translations = {
     history: "下载历史",
     settings: "系统设置",
     addTracker: "添加追踪",
-    syncInterval: "自动监控已启用",
+    syncInterval: "自动监控已开启",
     subTarget: "动画名称",
     mode: "模式",
     lastSync: "最后同步",
@@ -81,8 +81,8 @@ const translations = {
     configTracker: "配置规则",
     animeTitle: "动画名称",
     rssUrl: "RSS 链接",
-    keywords: "关键字",
-    downloadHist: "下载历史集数",
+    keywords: "包含关键字",
+    downloadHist: "下载 RSS 中已有的历史集数",
     histDesc: "下载所有匹配项",
     monitorDesc: "仅追踪新番",
     discard: "取消",
@@ -103,7 +103,7 @@ const translations = {
     status_pending: "等待",
     settingsSaved: "已保存！",
     connectionTip: "提示：无法连接请检查 IP。",
-    copyAll: "复制全部",
+    copyAll: "复制全部磁力链",
     exportTxt: "导出为 .txt",
     copied: "已复制",
     clearHistory: "清空历史",
@@ -112,7 +112,7 @@ const translations = {
     engineVersion: "系统版本",
     nodeStatus: "运行状态",
     online: "在线",
-    error: "出错了：保存失败。"
+    error: "保存失败："
   },
   jp: {
     title: "アニメガーデン",
@@ -166,7 +166,7 @@ const translations = {
     engineVersion: "バージョン",
     nodeStatus: "ステータス",
     online: "オンライン",
-    error: "エラーが発生しました。"
+    error: "エラー："
   }
 };
 
@@ -210,20 +210,24 @@ function App() {
   const upsertMutation = useMutation({
     mutationFn: (sub: typeof newSub) => {
       const filters = sub.keywords ? sub.keywords.split(',').map(kw => ({ keyword: kw.trim(), type: 'include' })) : [];
-      // Strip 'keywords' from payload because backend model doesn't expect it
-      const { keywords, ...payloadBase } = sub;
-      const payload = { ...payloadBase, filters };
+      // Payload for backend: strictly following Pydantic model
+      const payload = {
+        name: sub.name,
+        url: sub.url,
+        download_history: sub.download_history,
+        filters: filters
+      };
       if (editId) return axios.patch(`${API_BASE}/subscriptions/${editId}`, payload);
       return axios.post(`${API_BASE}/subscriptions/`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       closeModal();
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 1500);
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 1000);
     },
-    onError: (err) => {
-      console.error(err);
-      alert(t.error);
+    onError: (err: any) => {
+      const msg = err.response?.data?.detail || err.message;
+      alert(`${t.error}${JSON.stringify(msg)}`);
     }
   });
 
@@ -252,8 +256,6 @@ function App() {
       name: sub.name,
       url: sub.url,
       download_history: sub.download_history,
-      // Need to find keywords from original filters if they came back with sub
-      // If backend returns filters in the GET /, we use them.
       keywords: sub.filters?.map((f:any) => f.keyword).join(', ') || ''
     });
     setIsModalOpen(true);
@@ -340,7 +342,11 @@ function App() {
                       <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${sub.download_history ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{sub.download_history ? t.archiveMode : t.monitorMode}</span></td>
                       <td className="px-6 py-4 text-[11px] text-slate-400 tabular-nums">{sub.last_checked_at ? new Date(sub.last_checked_at).toLocaleString() : t.waiting}</td>
                       <td className="px-6 py-4 text-right"><div className="flex justify-end items-center gap-3">
-                        <label className="relative inline-flex items-center cursor-pointer scale-90"><input type="checkbox" className="sr-only peer" checked={sub.is_active} onChange={() => toggleMutation.mutate({id: sub.id, active: !sub.is_active})} /><div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>
+                        {/* Improved Toggle Switch */}
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={sub.is_active} onChange={() => toggleMutation.mutate({id: sub.id, active: !sub.is_active})} />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
                         <button onClick={() => openEdit(sub)} className="p-1.5 text-slate-300 hover:text-blue-500 transition-all"><Edit3 size={16} /></button>
                         <button onClick={() => deleteMutation.mutate(sub.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
                       </div></td>
@@ -357,24 +363,9 @@ function App() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">{t.history}</h2>
               <div className="flex gap-2">
-                <button 
-                  onClick={() => { if(window.confirm(t.confirmClear)) clearHistoryMutation.mutate(); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 font-bold text-[11px] transition-all"
-                >
-                  <Trash2 size={14}/> {t.clearHistory}
-                </button>
-                <button 
-                  onClick={() => copyToClipboard(historyList?.map((i:any) => i.magnet_link).join('\n') || '', 'batch')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all ${isBatchCopied ? 'bg-green-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                >
-                  {isBatchCopied ? <Check size={14}/> : <Copy size={14}/>} {isBatchCopied ? t.copied : t.copyAll}
-                </button>
-                <button 
-                  onClick={exportAsTxt}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] shadow-sm transition-all"
-                >
-                  <FileText size={14}/> {t.exportTxt}
-                </button>
+                <button onClick={() => { if(window.confirm(t.confirmClear)) clearHistoryMutation.mutate(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 font-bold text-[11px] transition-all"><Trash2 size={14}/> {t.clearHistory}</button>
+                <button onClick={() => copyToClipboard(historyList?.map((i:any) => i.magnet_link).join('\n') || '', 'batch')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all ${isBatchCopied ? 'bg-green-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{isBatchCopied ? <Check size={14}/> : <Copy size={14}/>} {isBatchCopied ? t.copied : t.copyAll}</button>
+                <button onClick={exportAsTxt} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] transition-all"><FileText size={14}/> {t.exportTxt}</button>
               </div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -383,25 +374,18 @@ function App() {
                   <div key={item.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 group">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
-                          item.status === 'submitted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                          item.status === 'skipped' ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-rose-50 text-rose-600 border-rose-100'
-                        }`}>{t[`status_${item.status}` as keyof typeof t] || item.status}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${item.status === 'submitted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : item.status === 'skipped' ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>{t[`status_${item.status}` as keyof typeof t] || item.status}</span>
                         <span className="text-[10px] text-slate-300 tabular-nums font-medium">{new Date(item.created_at).toLocaleString()}</span>
                       </div>
                       <h3 className="text-[13px] font-semibold text-slate-700 leading-snug truncate pr-4">{item.title}</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => copyToClipboard(item.magnet_link, item.id)} className={`p-2 rounded-lg transition-all ${copiedId === item.id ? 'bg-green-50 text-green-600' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`}>
-                        {copiedId === item.id ? <Check size={14}/> : <Copy size={14}/>}
-                      </button>
+                      <button onClick={() => copyToClipboard(item.magnet_link, item.id)} className={`p-2 rounded-lg transition-all ${copiedId === item.id ? 'bg-green-50 text-green-600' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`}>{copiedId === item.id ? <Check size={14}/> : <Copy size={14}/>}</button>
                       <a href={item.magnet_link} className="p-2 text-slate-300 hover:bg-slate-100 hover:text-blue-600 rounded-lg transition-all"><ExternalLink size={14} /></a>
                     </div>
                   </div>
                 ))}
-                {(!historyList || historyList.length === 0) && (
-                  <div className="py-20 text-center text-slate-300 text-sm italic font-medium">{t.noTrackers}</div>
-                )}
+                {(!historyList || historyList.length === 0) && (<div className="py-20 text-center text-slate-300 text-sm italic font-medium">{t.noTrackers}</div>)}
               </div>
             </div>
           </>
@@ -424,7 +408,7 @@ function App() {
                 </div>
               </div>
               <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-300">
-                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.3</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
+                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.4</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
               </div>
             </div>
           </div>
@@ -447,7 +431,7 @@ function App() {
               {!editId && (
                 <div className={`flex items-center gap-4 p-6 rounded-2xl border-2 transition-all cursor-pointer ${newSub.download_history ? 'bg-orange-50/50 border-orange-100 shadow-sm shadow-orange-100' : 'bg-blue-50/50 border-blue-100 shadow-sm shadow-blue-100'}`} onClick={() => setNewSub({...newSub, download_history: !newSub.download_history})}>
                   <input type="checkbox" className="w-6 h-6 rounded-lg text-blue-600 pointer-events-none" checked={newSub.download_history} readOnly />
-                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><p className="text-[10px] font-bold opacity-60 leading-none mt-1">{newSub.download_history ? t.histDesc : t.monitorDesc}</p></div>
+                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><span className={`block text-[10px] font-bold mt-1 opacity-60 uppercase tracking-wide ${newSub.download_history ? 'text-orange-600' : 'text-blue-600'}`}>{newSub.download_history ? t.histDesc : t.monitorDesc}</span></div>
                 </div>
               )}
             </div>
