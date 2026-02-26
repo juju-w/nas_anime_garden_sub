@@ -1,8 +1,6 @@
-# Multi-stage build for frontend and backend
 # Phase 1: Build Frontend (React)
-FROM node:18-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
-# Set registry mirror for faster build in China
 RUN npm config set registry https://registry.npmmirror.com
 COPY frontend/package*.json ./
 COPY frontend/pnpm-lock.yaml* ./
@@ -21,12 +19,9 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # Copy backend application
 COPY backend/app/ /app/app/
 
-# Expose port
+# Copy built frontend assets to static dir
+COPY --from=frontend-builder /app/frontend/dist /app/static
+
 EXPOSE 8000
-
-# Set environment variables
 ENV PYTHONPATH=/app
-
-# Command to run the application
-# Use app.main:app because main.py is inside the app directory
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -32,7 +30,16 @@ services:
       - "6881:6881/udp"
     volumes:
       - ./data/aria2-config:/config
-      - ./downloads:/downloads
+      - ./downloads:/downloads  # 这里是下载存放位置
+    networks:
+      - anime-net
+    restart: always
+
+  ariang:
+    image: p3terx/ariang
+    container_name: ariang
+    ports:
+      - "6880:6880"
     networks:
       - anime-net
     restart: always

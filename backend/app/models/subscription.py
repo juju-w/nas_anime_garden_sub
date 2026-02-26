@@ -9,7 +9,7 @@ class Subscription(Base):
     name = Column(String, index=True)
     url = Column(String, unique=True, index=True)
     is_active = Column(Boolean, default=True)
-    download_history = Column(Boolean, default=False)  # 是否下载现有历史条目
+    download_history = Column(Boolean, default=False)
     last_checked_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -21,7 +21,7 @@ class Filter(Base):
     id = Column(Integer, primary_key=True, index=True)
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"))
     keyword = Column(String)
-    type = Column(String)  # 'include' or 'exclude'
+    type = Column(String)
     
     subscription = relationship("Subscription", back_populates="filters")
 
@@ -31,7 +31,12 @@ class DownloadHistory(Base):
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"))
     title = Column(String)
     magnet_link = Column(String)
-    status = Column(String, default="pending")  # pending, submitted, failed
+    status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     
     subscription = relationship("Subscription", back_populates="history")
+
+class Setting(Base):
+    __tablename__ = "settings"
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String)
