@@ -34,12 +34,12 @@ const translations = {
     discard: "Cancel",
     activate: "Activate",
     update: "Update",
-    ariaStatus: "Aria2 Connection",
-    ariaRpc: "RPC Endpoint",
+    ariaStatus: "Aria2 RPC",
+    ariaRpc: "RPC URL",
     ariaSecret: "Token",
-    storage: "Downloads are stored in your Aria2 default path.",
+    storage: "Defined in Aria2 config.",
     openAriaNg: "Open Monitor",
-    saveSettings: "Save Configuration",
+    saveSettings: "Save",
     downloadStatus: "Status",
     episodeTitle: "Episode",
     timestamp: "Time",
@@ -57,7 +57,8 @@ const translations = {
     systemInfo: "System Info",
     engineVersion: "Engine Version",
     nodeStatus: "Node Status",
-    online: "Online"
+    online: "Online",
+    error: "Error: Could not save."
   },
   cn: {
     title: "动漫花园",
@@ -65,7 +66,7 @@ const translations = {
     history: "下载历史",
     settings: "系统设置",
     addTracker: "添加追踪",
-    syncInterval: "自动监控已开启",
+    syncInterval: "自动监控已启用",
     subTarget: "动画名称",
     mode: "模式",
     lastSync: "最后同步",
@@ -110,7 +111,8 @@ const translations = {
     systemInfo: "运行信息",
     engineVersion: "系统版本",
     nodeStatus: "运行状态",
-    online: "在线"
+    online: "在线",
+    error: "出错了：保存失败。"
   },
   jp: {
     title: "アニメガーデン",
@@ -163,7 +165,8 @@ const translations = {
     systemInfo: "システム情報",
     engineVersion: "バージョン",
     nodeStatus: "ステータス",
-    online: "オンライン"
+    online: "オンライン",
+    error: "エラーが発生しました。"
   }
 };
 
@@ -203,17 +206,64 @@ function App() {
   useEffect(() => { if (appSettings) setEditSettings(appSettings); }, [appSettings]);
 
   const saveSettingsMutation = useMutation({ mutationFn: (data: typeof editSettings) => axios.put(`${API_BASE}/settings/`, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['settings'] }); alert(t.settingsSaved); } });
-  const upsertMutation = useMutation({ mutationFn: (sub: typeof newSub) => { const filters = sub.keywords ? sub.keywords.split(',').map(kw => ({ keyword: kw.trim(), type: 'include' })) : []; const payload = { ...sub, filters }; if (editId) return axios.patch(`${API_BASE}/subscriptions/${editId}`, payload); return axios.post(`${API_BASE}/subscriptions/`, payload); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['subscriptions'] }); closeModal(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 2000); } });
-  const toggleMutation = useMutation({ mutationFn: ({id, active}: {id: number, active: boolean}) => axios.patch(`${API_BASE}/subscriptions/${id}`, { is_active: active }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['subscriptions'] }); setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 2000); } });
-  const deleteMutation = useMutation({ mutationFn: (id: number) => axios.delete(`${API_BASE}/subscriptions/${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }) });
+  
+  const upsertMutation = useMutation({
+    mutationFn: (sub: typeof newSub) => {
+      const filters = sub.keywords ? sub.keywords.split(',').map(kw => ({ keyword: kw.trim(), type: 'include' })) : [];
+      // Strip 'keywords' from payload because backend model doesn't expect it
+      const { keywords, ...payloadBase } = sub;
+      const payload = { ...payloadBase, filters };
+      if (editId) return axios.patch(`${API_BASE}/subscriptions/${editId}`, payload);
+      return axios.post(`${API_BASE}/subscriptions/`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      closeModal();
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 1500);
+    },
+    onError: (err) => {
+      console.error(err);
+      alert(t.error);
+    }
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({id, active}: {id: number, active: boolean}) => 
+      axios.patch(`${API_BASE}/subscriptions/${id}`, { is_active: active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 1500);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => axios.delete(`${API_BASE}/subscriptions/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
+  });
   
   const clearHistoryMutation = useMutation({
     mutationFn: () => axios.delete(`${API_BASE}/history/clear`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] })
   });
 
-  const openEdit = (sub: any) => { setEditId(sub.id); setNewSub({ name: sub.name, url: sub.url, download_history: sub.download_history, keywords: sub.filters?.map((f:any) => f.keyword).join(', ') || '' }); setIsModalOpen(true); };
-  const closeModal = () => { setIsModalOpen(false); setEditId(null); setNewSub({ name: '', url: '', download_history: false, keywords: '' }); };
+  const openEdit = (sub: any) => {
+    setEditId(sub.id);
+    setNewSub({
+      name: sub.name,
+      url: sub.url,
+      download_history: sub.download_history,
+      // Need to find keywords from original filters if they came back with sub
+      // If backend returns filters in the GET /, we use them.
+      keywords: sub.filters?.map((f:any) => f.keyword).join(', ') || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditId(null);
+    setNewSub({ name: '', url: '', download_history: false, keywords: '' });
+  };
 
   const getAriaNgLink = () => {
     try {
@@ -290,7 +340,7 @@ function App() {
                       <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${sub.download_history ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{sub.download_history ? t.archiveMode : t.monitorMode}</span></td>
                       <td className="px-6 py-4 text-[11px] text-slate-400 tabular-nums">{sub.last_checked_at ? new Date(sub.last_checked_at).toLocaleString() : t.waiting}</td>
                       <td className="px-6 py-4 text-right"><div className="flex justify-end items-center gap-3">
-                        <label className="relative inline-flex items-center cursor-pointer scale-90"><input type="checkbox" className="sr-only peer" checked={sub.is_active} onChange={() => toggleMutation.mutate({id: sub.id, active: !sub.is_active})} /><div className="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>
+                        <label className="relative inline-flex items-center cursor-pointer scale-90"><input type="checkbox" className="sr-only peer" checked={sub.is_active} onChange={() => toggleMutation.mutate({id: sub.id, active: !sub.is_active})} /><div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>
                         <button onClick={() => openEdit(sub)} className="p-1.5 text-slate-300 hover:text-blue-500 transition-all"><Edit3 size={16} /></button>
                         <button onClick={() => deleteMutation.mutate(sub.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
                       </div></td>
@@ -321,7 +371,7 @@ function App() {
                 </button>
                 <button 
                   onClick={exportAsTxt}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] shadow-sm transition-all"
                 >
                   <FileText size={14}/> {t.exportTxt}
                 </button>
@@ -373,10 +423,8 @@ function App() {
                   <a href={getAriaNgLink()} target="_blank" className="flex-1 bg-slate-900 hover:bg-black text-white py-3 rounded-xl font-bold text-xs flex justify-center items-center gap-2 shadow-sm transition-all">{t.openAriaNg} <ExternalLink size={14}/></a>
                 </div>
               </div>
-              
-              {/* System Footer Info */}
               <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-300">
-                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.2</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
+                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.3</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
               </div>
             </div>
           </div>
@@ -399,12 +447,12 @@ function App() {
               {!editId && (
                 <div className={`flex items-center gap-4 p-6 rounded-2xl border-2 transition-all cursor-pointer ${newSub.download_history ? 'bg-orange-50/50 border-orange-100 shadow-sm shadow-orange-100' : 'bg-blue-50/50 border-blue-100 shadow-sm shadow-blue-100'}`} onClick={() => setNewSub({...newSub, download_history: !newSub.download_history})}>
                   <input type="checkbox" className="w-6 h-6 rounded-lg text-blue-600 pointer-events-none" checked={newSub.download_history} readOnly />
-                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><span className={`block text-[10px] font-bold mt-1 opacity-60 uppercase tracking-wide ${newSub.download_history ? 'text-orange-600' : 'text-blue-600'}`}>{newSub.download_history ? t.histDesc : t.monitorDesc}</span></div>
+                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><p className="text-[10px] font-bold opacity-60 leading-none mt-1">{newSub.download_history ? t.histDesc : t.monitorDesc}</p></div>
                 </div>
               )}
             </div>
             <div className="px-10 py-8 bg-slate-50/50 border-t border-slate-50 flex justify-end gap-4">
-              <button onClick={closeModal} className="px-6 py-3 text-[11px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-widest transition-colors">{t.discard}</button>
+              <button onClick={closeModal} className="px-6 py-3 text-[11px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-widest">{t.discard}</button>
               <button onClick={() => upsertMutation.mutate(newSub)} disabled={!newSub.name || !newSub.url || upsertMutation.isPending} className="px-8 py-3.5 bg-blue-600 text-white rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-3 shadow-lg shadow-blue-100 uppercase tracking-widest active:scale-95 transition-all hover:bg-blue-700">{upsertMutation.isPending && <Loader2 size={18} className="animate-spin" />} {editId ? t.update : t.activate}</button>
             </div>
           </div>

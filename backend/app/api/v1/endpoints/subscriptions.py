@@ -16,13 +16,11 @@ def get_db():
     finally:
         db.close()
 
-# Helper to run sync in background
 async def run_sync(sub_id: int):
     db = SessionLocal()
     try:
         sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
         if sub and sub.is_active:
-            print(f"Triggering immediate sync for: {sub.name}")
             await scraper.fetch_and_process(db, sub)
     finally:
         db.close()
@@ -61,10 +59,9 @@ def read_subscriptions(db: Session = Depends(get_db)) -> Any:
 
 @router.post("/", response_model=SubscriptionResponse)
 async def create_subscription(
-    *, 
-    db: Session = Depends(get_db), 
     sub_in: SubscriptionCreate,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ) -> Any:
     subscription = Subscription(
         name=sub_in.name, 
@@ -81,43 +78,48 @@ async def create_subscription(
     
     db.commit()
     db.refresh(subscription)
-    
-    # Trigger immediate sync
     background_tasks.add_task(run_sync, subscription.id)
-    
     return subscription
 
 @router.patch("/{sub_id}", response_model=SubscriptionResponse)
 async def update_subscription(
     sub_id: int, 
     sub_in: SubscriptionUpdate, 
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ) -> Any:
     db_sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
     if not db_sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
     update_data = sub_in.model_dump(exclude_unset=True)
+    
+    # Track critical changes to trigger sync
+    trigger_sync = False
     was_inactive = not db_sub.is_active
     
-    for field in ["name", "url", "is_active", "download_history"]:
-        if field in update_data:
-            setattr(db_sub, field, update_data[field])
-    
+    if "is_active" in update_data and update_data["is_active"] and was_inactive:
+        trigger_sync = True
+    if "url" in update_data and update_data["url"] != db_sub.url:
+        trigger_sync = True
     if "filters" in update_data:
+        trigger_sync = True
+        # Update filters
         db.query(Filter).filter(Filter.subscription_id == sub_id).delete()
         for f in update_data["filters"]:
             db_filter = Filter(subscription_id=sub_id, keyword=f.keyword, type=f.type)
             db.add(db_filter)
+    
+    # Update other fields
+    for field in ["name", "url", "is_active", "download_history"]:
+        if field in update_data:
+            setattr(db_sub, field, update_data[field])
             
     db.commit()
     db.refresh(db_sub)
     
-    # Trigger sync if it was turned on or if details were changed
-    if db_sub.is_active and (was_inactive or "url" in update_data or "filters" in update_data):
-        if background_tasks:
-            background_tasks.add_task(run_sync, db_sub.id)
+    if trigger_sync and db_sub.is_active:
+        background_tasks.add_task(run_sync, db_sub.id)
             
     return db_sub
 

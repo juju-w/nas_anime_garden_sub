@@ -15,11 +15,9 @@ class RSSScraper:
         self._executor = ThreadPoolExecutor(max_workers=3)
 
     async def fetch_and_process(self, db: Session, subscription: Subscription):
-        """Fetch RSS and process efficiently."""
+        """Fetch RSS and process efficiently with duplicate prevention."""
         try:
             response = await self.client.get(subscription.url)
-            
-            # Offload CPU-bound parsing to thread pool to keep event loop responsive
             loop = asyncio.get_event_loop()
             feed = await loop.run_in_executor(self._executor, feedparser.parse, response.text)
             
@@ -27,25 +25,34 @@ class RSSScraper:
             include_keywords = [f.keyword for f in filters if f.type == 'include']
             exclude_keywords = [f.keyword for f in filters if f.type == 'exclude']
             
-            is_first_run = subscription.last_checked_at is None
-            new_items = []
+            # Key logic: is this the absolute first time we see this subscription?
+            is_new_tracker = subscription.last_checked_at is None
+            new_items_processed = []
 
             for entry in feed.entries:
                 title = entry.title
                 magnet = self._extract_magnet(entry)
                 if not magnet: continue
                 
-                # Use a fast check first
+                # Check 1: Is it already in our DB? (If not cleared)
                 if db.query(DownloadHistory.id).filter(DownloadHistory.magnet_link == magnet).first():
                     continue
                 
+                # Check 2: Matching keywords
                 if self._should_download(title, include_keywords, exclude_keywords):
                     status = "skipped"
-                    if subscription.download_history or not is_first_run:
+                    
+                    # Logic for downloading:
+                    # 1. If 'Archive Mode' is ON, we download everything we don't have in DB.
+                    # 2. If 'Archive Mode' is OFF, we ONLY download if the tracker has already run before.
+                    #    This prevents re-downloading old stuff after clearing history.
+                    should_trigger_download = subscription.download_history or not is_new_tracker
+                    
+                    if should_trigger_download:
                         gid = await downloader.add_magnet(magnet)
                         status = "submitted" if gid else "failed"
                     
-                    # Batch records instead of individual commits
+                    # Record so we don't process again
                     new_history = DownloadHistory(
                         subscription_id=subscription.id,
                         title=title,
@@ -53,13 +60,13 @@ class RSSScraper:
                         status=status
                     )
                     db.add(new_history)
-                    new_items.append(title)
+                    new_items_processed.append(title)
 
             subscription.last_checked_at = datetime.utcnow()
-            db.commit() # Single commit per feed
+            db.commit()
             
-            if new_items:
-                print(f"[{subscription.name}] Processed {len(new_items)} new items.")
+            if new_items_processed:
+                print(f"[{subscription.name}] Processed {len(new_items_processed)} items (Action: {subscription.download_history})")
                 
         except Exception as e:
             db.rollback()
