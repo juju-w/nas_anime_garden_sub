@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Globe, ExternalLink, Edit3, Copy, Check, FileText } from 'lucide-react';
+import { Plus, Trash2, Loader2, Globe, ExternalLink, Edit3, Copy, Check, FileText, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -34,12 +34,12 @@ const translations = {
     discard: "Cancel",
     activate: "Activate",
     update: "Update",
-    ariaStatus: "Aria2 RPC",
-    ariaRpc: "RPC URL",
+    ariaStatus: "Aria2 Connection",
+    ariaRpc: "RPC Endpoint",
     ariaSecret: "Token",
-    storage: "Defined in Aria2 config.",
+    storage: "Downloads are stored in your Aria2 default path.",
     openAriaNg: "Open Monitor",
-    saveSettings: "Save",
+    saveSettings: "Save Configuration",
     downloadStatus: "Status",
     episodeTitle: "Episode",
     timestamp: "Time",
@@ -49,9 +49,15 @@ const translations = {
     status_pending: "Wait",
     settingsSaved: "Saved!",
     connectionTip: "Use NAS IP for RPC.",
-    copyAll: "Copy All Magnets",
+    copyAll: "Copy All",
     exportTxt: "Export .txt",
-    copied: "All copied!"
+    copied: "Copied!",
+    clearHistory: "Clear History",
+    confirmClear: "Clear all records? (Irreversible)",
+    systemInfo: "System Info",
+    engineVersion: "Engine Version",
+    nodeStatus: "Node Status",
+    online: "Online"
   },
   cn: {
     title: "动漫花园",
@@ -81,12 +87,12 @@ const translations = {
     discard: "取消",
     activate: "激活",
     update: "更新",
-    ariaStatus: "Aria2 配置",
+    ariaStatus: "Aria2 连接设置",
     ariaRpc: "RPC 地址",
     ariaSecret: "密钥",
-    storage: "路径请在 Aria2 中设置。",
+    storage: "下载路径请在 Aria2 自身配置中设置。",
     openAriaNg: "打开监控",
-    saveSettings: "保存",
+    saveSettings: "保存设置",
     downloadStatus: "状态",
     episodeTitle: "剧集名称",
     timestamp: "时间",
@@ -96,9 +102,15 @@ const translations = {
     status_pending: "等待",
     settingsSaved: "已保存！",
     connectionTip: "提示：无法连接请检查 IP。",
-    copyAll: "复制全部磁力链",
+    copyAll: "复制全部",
     exportTxt: "导出为 .txt",
-    copied: "已复制到剪贴板"
+    copied: "已复制",
+    clearHistory: "清空历史",
+    confirmClear: "确定要清空所有历史记录吗？(不可恢复)",
+    systemInfo: "运行信息",
+    engineVersion: "系统版本",
+    nodeStatus: "运行状态",
+    online: "在线"
   },
   jp: {
     title: "アニメガーデン",
@@ -145,7 +157,13 @@ const translations = {
     connectionTip: "IPを確認してください。",
     copyAll: "全コピー",
     exportTxt: ".txt出力",
-    copied: "コピーしました"
+    copied: "完了",
+    clearHistory: "履歴をクリア",
+    confirmClear: "全ての履歴を削除しますか？",
+    systemInfo: "システム情報",
+    engineVersion: "バージョン",
+    nodeStatus: "ステータス",
+    online: "オンライン"
   }
 };
 
@@ -188,6 +206,11 @@ function App() {
   const upsertMutation = useMutation({ mutationFn: (sub: typeof newSub) => { const filters = sub.keywords ? sub.keywords.split(',').map(kw => ({ keyword: kw.trim(), type: 'include' })) : []; const payload = { ...sub, filters }; if (editId) return axios.patch(`${API_BASE}/subscriptions/${editId}`, payload); return axios.post(`${API_BASE}/subscriptions/`, payload); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['subscriptions'] }); closeModal(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 2000); } });
   const toggleMutation = useMutation({ mutationFn: ({id, active}: {id: number, active: boolean}) => axios.patch(`${API_BASE}/subscriptions/${id}`, { is_active: active }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['subscriptions'] }); setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 2000); } });
   const deleteMutation = useMutation({ mutationFn: (id: number) => axios.delete(`${API_BASE}/subscriptions/${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }) });
+  
+  const clearHistoryMutation = useMutation({
+    mutationFn: () => axios.delete(`${API_BASE}/history/clear`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] })
+  });
 
   const openEdit = (sub: any) => { setEditId(sub.id); setNewSub({ name: sub.name, url: sub.url, download_history: sub.download_history, keywords: sub.filters?.map((f:any) => f.keyword).join(', ') || '' }); setIsModalOpen(true); };
   const closeModal = () => { setIsModalOpen(false); setEditId(null); setNewSub({ name: '', url: '', download_history: false, keywords: '' }); };
@@ -220,7 +243,7 @@ function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `anime_magnets_${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = `magnets_${new Date().toISOString().split('T')[0]}.txt`;
     link.click();
   };
 
@@ -258,7 +281,7 @@ function App() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-slate-50/50 border-b border-slate-200 text-slate-400 text-[9px] font-bold uppercase tracking-wider">
-                  <tr><th className="px-6 py-3">{t.subTarget}</th><th className="px-6 py-3">{t.mode}</th><th className="px-6 py-3">{t.lastSync}</th><th className="px-6 py-3 text-right">{t.actions}</th></tr>
+                  <tr><th className="px-6 py-3 font-bold">{t.subTarget}</th><th className="px-6 py-3 font-bold">{t.mode}</th><th className="px-6 py-3 font-bold">{t.lastSync}</th><th className="px-6 py-3 text-right font-bold">{t.actions}</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[13px]">
                   {subscriptions?.map((sub: any) => (
@@ -285,14 +308,20 @@ function App() {
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">{t.history}</h2>
               <div className="flex gap-2">
                 <button 
+                  onClick={() => { if(window.confirm(t.confirmClear)) clearHistoryMutation.mutate(); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 font-bold text-[11px] transition-all"
+                >
+                  <Trash2 size={14}/> {t.clearHistory}
+                </button>
+                <button 
                   onClick={() => copyToClipboard(historyList?.map((i:any) => i.magnet_link).join('\n') || '', 'batch')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all shadow-sm ${isBatchCopied ? 'bg-green-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all ${isBatchCopied ? 'bg-green-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >
                   {isBatchCopied ? <Check size={14}/> : <Copy size={14}/>} {isBatchCopied ? t.copied : t.copyAll}
                 </button>
                 <button 
                   onClick={exportAsTxt}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] shadow-sm transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] transition-all"
                 >
                   <FileText size={14}/> {t.exportTxt}
                 </button>
@@ -308,16 +337,12 @@ function App() {
                           item.status === 'submitted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                           item.status === 'skipped' ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-rose-50 text-rose-600 border-rose-100'
                         }`}>{t[`status_${item.status}` as keyof typeof t] || item.status}</span>
-                        <span className="text-[10px] text-slate-300 tabular-nums">{new Date(item.created_at).toLocaleString()}</span>
+                        <span className="text-[10px] text-slate-300 tabular-nums font-medium">{new Date(item.created_at).toLocaleString()}</span>
                       </div>
                       <h3 className="text-[13px] font-semibold text-slate-700 leading-snug truncate pr-4">{item.title}</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => copyToClipboard(item.magnet_link, item.id)}
-                        className={`p-2 rounded-lg transition-all ${copiedId === item.id ? 'bg-green-50 text-green-600' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`}
-                        title="Copy Magnet Link"
-                      >
+                      <button onClick={() => copyToClipboard(item.magnet_link, item.id)} className={`p-2 rounded-lg transition-all ${copiedId === item.id ? 'bg-green-50 text-green-600' : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'}`}>
                         {copiedId === item.id ? <Check size={14}/> : <Copy size={14}/>}
                       </button>
                       <a href={item.magnet_link} className="p-2 text-slate-300 hover:bg-slate-100 hover:text-blue-600 rounded-lg transition-all"><ExternalLink size={14} /></a>
@@ -325,7 +350,7 @@ function App() {
                   </div>
                 ))}
                 {(!historyList || historyList.length === 0) && (
-                  <div className="py-20 text-center text-slate-300 text-sm italic">{t.noTrackers}</div>
+                  <div className="py-20 text-center text-slate-300 text-sm italic font-medium">{t.noTrackers}</div>
                 )}
               </div>
             </div>
@@ -333,52 +358,54 @@ function App() {
         )}
 
         {view === 'settings' && (
-          <>
+          <div className="animate-in fade-in duration-500">
             <h2 className="text-xl font-bold text-slate-900 tracking-tight mb-6">{t.settings}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-6 text-slate-900 font-bold text-sm"><Globe size={16} className="text-blue-600" /> {t.ariaStatus}</div>
-                <div className="space-y-4">
-                  <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">{t.ariaRpc}</label><input type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none text-xs font-mono" value={editSettings.aria2_rpc_url} onChange={e => setEditSettings({...editSettings, aria2_rpc_url: e.target.value})} /></div>
-                  <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">{t.ariaSecret}</label><input type="password" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none text-xs" value={editSettings.aria2_rpc_secret} onChange={e => setEditSettings({...editSettings, aria2_rpc_secret: e.target.value})} /></div>
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => saveSettingsMutation.mutate(editSettings)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold text-[11px] shadow-sm transition-all">{t.saveSettings}</button>
-                    <a href={getAriaNgLink()} target="_blank" className="flex-1 bg-slate-800 hover:bg-black text-white py-2 rounded-lg font-bold text-[11px] flex justify-center items-center gap-1.5">{t.openAriaNg} <ExternalLink size={12}/></a>
-                  </div>
+            <div className="max-w-2xl bg-white p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+              <div className="flex items-center gap-3 mb-10"><div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center"><Globe size={20} strokeWidth={2.5} /></div><h3 className="text-lg font-bold tracking-tight">{t.ariaStatus}</h3></div>
+              <div className="space-y-6 relative z-10">
+                <div className="grid grid-cols-1 gap-6">
+                  <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-widest">{t.ariaRpc}</label><input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none text-sm font-mono text-slate-700" value={editSettings.aria2_rpc_url} onChange={e => setEditSettings({...editSettings, aria2_rpc_url: e.target.value})} /></div>
+                  <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-widest">{t.ariaSecret}</label><input type="password" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none text-sm font-mono text-slate-700" value={editSettings.aria2_rpc_secret} onChange={e => setEditSettings({...editSettings, aria2_rpc_secret: e.target.value})} /></div>
+                </div>
+                <div className="flex items-start gap-3 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50"><AlertCircle size={16} className="text-blue-500 shrink-0 mt-0.5" /><p className="text-[11px] font-medium text-blue-600 leading-relaxed italic">{t.connectionTip}</p></div>
+                <div className="flex gap-4 pt-4 border-t border-slate-100">
+                  <button onClick={() => saveSettingsMutation.mutate(editSettings)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-xs shadow-sm transition-all">{t.saveSettings}</button>
+                  <a href={getAriaNgLink()} target="_blank" className="flex-1 bg-slate-900 hover:bg-black text-white py-3 rounded-xl font-bold text-xs flex justify-center items-center gap-2 shadow-sm transition-all">{t.openAriaNg} <ExternalLink size={14}/></a>
                 </div>
               </div>
-              <div className="bg-slate-100 p-6 rounded-xl border border-slate-200 flex flex-col justify-between">
-                <div><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">System</h3><p className="text-slate-600 text-xs leading-relaxed font-medium italic">RSS Monitoring Engine</p></div>
-                <div className="pt-4 border-t border-slate-200/50 flex justify-between items-center font-mono text-[9px] text-slate-400 uppercase tracking-widest"><span>Node Status</span><span className="text-green-500 font-bold">Online</span></div>
+              
+              {/* System Footer Info */}
+              <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-300">
+                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.2</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </main>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <div><h3 className="font-bold text-base text-slate-900">{editId ? t.editSub : t.newSub}</h3><p className="text-[9px] text-blue-500 font-bold uppercase tracking-wider">{t.configTracker}</p></div>
-              <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 transition-all text-xl font-light">×</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
+            <div className="px-10 py-8 border-b border-slate-50 flex justify-between items-center bg-white">
+              <div><h3 className="font-bold text-xl text-slate-900">{editId ? t.editSub : t.newSub}</h3><p className="text-[10px] text-blue-500 mt-1 uppercase tracking-widest font-bold">{t.configTracker}</p></div>
+              <button onClick={closeModal} className="p-2 hover:bg-slate-100 rounded-full text-slate-300 hover:text-slate-900 transition-all text-2xl font-light">×</button>
             </div>
-            <div className="p-6 space-y-5">
-              <div className="space-y-4">
-                <div className="space-y-1.5"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.animeTitle}</label><input type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-lg outline-none font-semibold text-slate-800 text-sm" placeholder="Frieren" value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} /></div>
-                <div className="space-y-1.5"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.rssUrl}</label><input type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-lg outline-none font-semibold text-slate-800 text-[11px] font-mono" placeholder="https://..." value={newSub.url} onChange={e => setNewSub({...newSub, url: e.target.value})} /></div>
-                <div className="space-y-1.5"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.keywords}</label><input type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-lg outline-none font-semibold text-slate-800 text-sm" placeholder="简繁内封, 1080P" value={newSub.keywords} onChange={e => setNewSub({...newSub, keywords: e.target.value})} /></div>
+            <div className="p-10 space-y-8">
+              <div className="space-y-6">
+                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.animeTitle}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none transition-all font-bold text-slate-800 text-base shadow-sm" placeholder="Frieren" value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} /></div>
+                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.rssUrl}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none transition-all font-bold text-slate-800 text-sm font-mono shadow-sm" placeholder="https://..." value={newSub.url} onChange={e => setNewSub({...newSub, url: e.target.value})} /></div>
+                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.keywords}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none transition-all font-bold text-slate-800 text-base shadow-sm" placeholder="简繁内封, 1080P" value={newSub.keywords} onChange={e => setNewSub({...newSub, keywords: e.target.value})} /></div>
               </div>
               {!editId && (
-                <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${newSub.download_history ? 'bg-orange-50/50 border-orange-100' : 'bg-blue-50/50 border-blue-100'}`} onClick={() => setNewSub({...newSub, download_history: !newSub.download_history})}>
-                  <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600" checked={newSub.download_history} readOnly />
-                  <div className="flex-1"><span className={`block text-xs font-bold uppercase ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><p className="text-[9px] font-medium opacity-60 leading-none mt-0.5">{newSub.download_history ? t.histDesc : t.monitorDesc}</p></div>
+                <div className={`flex items-center gap-4 p-6 rounded-2xl border-2 transition-all cursor-pointer ${newSub.download_history ? 'bg-orange-50/50 border-orange-100 shadow-sm shadow-orange-100' : 'bg-blue-50/50 border-blue-100 shadow-sm shadow-blue-100'}`} onClick={() => setNewSub({...newSub, download_history: !newSub.download_history})}>
+                  <input type="checkbox" className="w-6 h-6 rounded-lg text-blue-600 pointer-events-none" checked={newSub.download_history} readOnly />
+                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><span className={`block text-[10px] font-bold mt-1 opacity-60 uppercase tracking-wide ${newSub.download_history ? 'text-orange-600' : 'text-blue-600'}`}>{newSub.download_history ? t.histDesc : t.monitorDesc}</span></div>
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 bg-slate-50 border-t flex justify-end gap-3">
-              <button onClick={closeModal} className="px-4 py-2 text-[10px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-widest">{t.discard}</button>
-              <button onClick={() => upsertMutation.mutate(newSub)} disabled={!newSub.name || !newSub.url || upsertMutation.isPending} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-[11px] font-bold disabled:opacity-30 flex items-center gap-2 shadow-sm transition-all hover:bg-blue-700">{upsertMutation.isPending && <Loader2 size={14} className="animate-spin" />} {editId ? t.update : t.activate}</button>
+            <div className="px-10 py-8 bg-slate-50/50 border-t border-slate-50 flex justify-end gap-4">
+              <button onClick={closeModal} className="px-6 py-3 text-[11px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-widest transition-colors">{t.discard}</button>
+              <button onClick={() => upsertMutation.mutate(newSub)} disabled={!newSub.name || !newSub.url || upsertMutation.isPending} className="px-8 py-3.5 bg-blue-600 text-white rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-3 shadow-lg shadow-blue-100 uppercase tracking-widest active:scale-95 transition-all hover:bg-blue-700">{upsertMutation.isPending && <Loader2 size={18} className="animate-spin" />} {editId ? t.update : t.activate}</button>
             </div>
           </div>
         </div>

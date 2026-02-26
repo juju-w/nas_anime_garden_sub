@@ -30,3 +30,10 @@ class HistoryResponse(BaseModel):
 def read_history(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)) -> Any:
     """Retrieve download history."""
     return db.query(DownloadHistory).order_by(DownloadHistory.created_at.desc()).offset(skip).limit(limit).all()
+
+@router.delete("/clear")
+def clear_history(db: Session = Depends(get_db)) -> Any:
+    """Remove all history records."""
+    db.query(DownloadHistory).delete()
+    db.commit()
+    return {"message": "History cleared successfully"}
