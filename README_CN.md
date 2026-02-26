@@ -43,9 +43,12 @@
    ```
 4. 通过浏览器访问 Web 界面：`http://<你的-NAS-IP>:8000`。
 
-### 使用技巧
+### 性能优化建议
 
-- **添加追踪器**：使用来自 `animes.garden` 的 RSS 链接（例如：`https://api.animes.garden/feed.xml?subject=515759`）。
+为了获得最佳的 BT 下载速度：
+1. **端口转发**：建议在路由器上将 `51413` 端口（TCP 和 UDP）转发到你的 NAS 内部 IP。
+2. **自动更新 Tracker**：本工具已配置 `UPDATE_TRACKERS=true`，容器每次启动时都会自动获取全球最新的 Tracker 列表。
+3. **磁盘缓存**：默认配置了 64M 缓存以减少对 NAS 硬盘的读写压力。
 - **关键字设置**：使用英文逗号分隔多个关键字（例如：`简繁内封, 1080P`）。
 - **初始同步**：如果你想下载 RSS 中已经存在的集数，请在添加时勾选 "Download historical episodes"。
 

@@ -6,9 +6,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///nas_anime.db
+      - DATABASE_URL=sqlite:////app/data/nas_anime.db
       - ARIA2_RPC_URL=http://aria2:6800/jsonrpc
       - ARIA2_RPC_SECRET=my_secret_token
+    volumes:
+      - ./data:/app/data
     depends_on:
       - aria2
     networks:
@@ -21,16 +23,26 @@ services:
     environment:
       - RPC_SECRET=my_secret_token
       - RPC_PORT=6800
-      - LISTEN_PORT=6881
+      - LISTEN_PORT=51413
+      # --- 自动更新 Tracker ---
+      - UPDATE_TRACKERS=true
+      - TRACKERS_LIST_URL=https://trackerslist.com/all_aria2.txt
+      # --- BT/PT 优化参数 ---
+      - ARIA2_CONF_ENABLE_DHT=true
+      - ARIA2_CONF_BT_ENABLE_LPD=true
+      - ARIA2_CONF_ENABLE_PEER_EXCHANGE=true
+      - ARIA2_CONF_BT_MAX_PEERS=128
+      - ARIA2_CONF_SEED_RATIO=1.0
+      # --- 其他性能设置 ---
       - DISK_CACHE=64M
       - UMASK_SET=022
     ports:
       - "6800:6800"
-      - "6881:6881"
-      - "6881:6881/udp"
+      - "51413:51413"
+      - "51413:51413/udp"
     volumes:
       - ./data/aria2-config:/config
-      - ./downloads:/downloads  # 这里是下载存放位置
+      - ./downloads:/downloads
     networks:
       - anime-net
     restart: always
