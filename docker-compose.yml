@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///nas_anime.db
+      - ARIA2_RPC_URL=http://aria2:6800/jsonrpc
+      - ARIA2_RPC_SECRET=my_secret_token
+    depends_on:
+      - aria2
+    networks:
+      - anime-net
+    restart: always
+
+  aria2:
+    image: p3terx/aria2-pro
+    container_name: aria2
+    environment:
+      - RPC_SECRET=my_secret_token
+      - RPC_PORT=6800
+      - LISTEN_PORT=6881
+      - DISK_CACHE=64M
+      - UMASK_SET=022
+    ports:
+      - "6800:6800"
+      - "6881:6881"
+      - "6881:6881/udp"
+    volumes:
+      - ./data/aria2-config:/config
+      - ./downloads:/downloads
+    networks:
+      - anime-net
+    restart: always
+
+networks:
+  anime-net:
+    driver: bridge
