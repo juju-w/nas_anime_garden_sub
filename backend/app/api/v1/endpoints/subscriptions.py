@@ -102,13 +102,17 @@ async def update_subscription(
         trigger_sync = True
     if "url" in update_data and update_data["url"] != db_sub.url:
         trigger_sync = True
+    
+    # Correctly handle filters list from Pydantic model
     if "filters" in update_data:
         trigger_sync = True
-        # Update filters
         db.query(Filter).filter(Filter.subscription_id == sub_id).delete()
-        for f in update_data["filters"]:
-            db_filter = Filter(subscription_id=sub_id, keyword=f.keyword, type=f.type)
-            db.add(db_filter)
+        # update_data["filters"] is a list of FilterBase models or dicts depending on dump mode
+        # Using sub_in.filters directly is safer as it's the model list
+        if sub_in.filters is not None:
+            for f in sub_in.filters:
+                db_filter = Filter(subscription_id=sub_id, keyword=f.keyword, type=f.type)
+                db.add(db_filter)
     
     # Update other fields
     for field in ["name", "url", "is_active", "download_history"]:

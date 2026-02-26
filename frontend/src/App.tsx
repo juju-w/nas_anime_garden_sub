@@ -210,13 +210,8 @@ function App() {
   const upsertMutation = useMutation({
     mutationFn: (sub: typeof newSub) => {
       const filters = sub.keywords ? sub.keywords.split(',').map(kw => ({ keyword: kw.trim(), type: 'include' })) : [];
-      // Payload for backend: strictly following Pydantic model
-      const payload = {
-        name: sub.name,
-        url: sub.url,
-        download_history: sub.download_history,
-        filters: filters
-      };
+      const { keywords, ...rest } = sub;
+      const payload = { ...rest, filters };
       if (editId) return axios.patch(`${API_BASE}/subscriptions/${editId}`, payload);
       return axios.post(`${API_BASE}/subscriptions/`, payload);
     },
@@ -237,6 +232,9 @@ function App() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }), 1500);
+    },
+    onError: (err: any) => {
+      alert(err.message);
     }
   });
 
@@ -342,10 +340,9 @@ function App() {
                       <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${sub.download_history ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{sub.download_history ? t.archiveMode : t.monitorMode}</span></td>
                       <td className="px-6 py-4 text-[11px] text-slate-400 tabular-nums">{sub.last_checked_at ? new Date(sub.last_checked_at).toLocaleString() : t.waiting}</td>
                       <td className="px-6 py-4 text-right"><div className="flex justify-end items-center gap-3">
-                        {/* Improved Toggle Switch */}
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" className="sr-only peer" checked={sub.is_active} onChange={() => toggleMutation.mutate({id: sub.id, active: !sub.is_active})} />
-                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
                         <button onClick={() => openEdit(sub)} className="p-1.5 text-slate-300 hover:text-blue-500 transition-all"><Edit3 size={16} /></button>
                         <button onClick={() => deleteMutation.mutate(sub.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={16} /></button>
@@ -408,7 +405,7 @@ function App() {
                 </div>
               </div>
               <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-300">
-                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.4</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
+                <div className="flex items-center gap-4"><span>{t.engineVersion}: v1.5.5</span><span>{t.nodeStatus}: <span className="text-green-500">{t.online}</span></span></div>
               </div>
             </div>
           </div>
@@ -425,13 +422,13 @@ function App() {
             <div className="p-10 space-y-8">
               <div className="space-y-6">
                 <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.animeTitle}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none transition-all font-bold text-slate-800 text-base shadow-sm" placeholder="Frieren" value={newSub.name} onChange={e => setNewSub({...newSub, name: e.target.value})} /></div>
-                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.rssUrl}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none transition-all font-bold text-slate-800 text-sm font-mono shadow-sm" placeholder="https://..." value={newSub.url} onChange={e => setNewSub({...newSub, url: e.target.value})} /></div>
-                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.keywords}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none transition-all font-bold text-slate-800 text-base shadow-sm" placeholder="简繁内封, 1080P" value={newSub.keywords} onChange={e => setNewSub({...newSub, keywords: e.target.value})} /></div>
+                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.rssUrl}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none font-bold text-slate-800 text-sm font-mono shadow-sm" placeholder="https://..." value={newSub.url} onChange={e => setNewSub({...newSub, url: e.target.value})} /></div>
+                <div className="space-y-2"><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t.keywords}</label><input type="text" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-xl outline-none font-bold text-slate-800 text-base shadow-sm" placeholder="简繁内封, 1080P" value={newSub.keywords} onChange={e => setNewSub({...newSub, keywords: e.target.value})} /></div>
               </div>
               {!editId && (
                 <div className={`flex items-center gap-4 p-6 rounded-2xl border-2 transition-all cursor-pointer ${newSub.download_history ? 'bg-orange-50/50 border-orange-100 shadow-sm shadow-orange-100' : 'bg-blue-50/50 border-blue-100 shadow-sm shadow-blue-100'}`} onClick={() => setNewSub({...newSub, download_history: !newSub.download_history})}>
                   <input type="checkbox" className="w-6 h-6 rounded-lg text-blue-600 pointer-events-none" checked={newSub.download_history} readOnly />
-                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><span className={`block text-[10px] font-bold mt-1 opacity-60 uppercase tracking-wide ${newSub.download_history ? 'text-orange-600' : 'text-blue-600'}`}>{newSub.download_history ? t.histDesc : t.monitorDesc}</span></div>
+                  <div className="flex-1"><span className={`block text-sm font-bold uppercase tracking-tight ${newSub.download_history ? 'text-orange-900' : 'text-blue-900'}`}>{t.downloadHist}</span><p className="text-[10px] font-bold opacity-60 leading-none mt-1">{newSub.download_history ? t.histDesc : t.monitorDesc}</p></div>
                 </div>
               )}
             </div>
