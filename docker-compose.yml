@@ -9,6 +9,7 @@ services:
       - DATABASE_URL=sqlite:////app/data/nas_anime.db
       - ARIA2_RPC_URL=http://aria2:6800/jsonrpc
       - ARIA2_RPC_SECRET=my_secret_token
+      - TZ=Asia/Shanghai  # 设置时区
     volumes:
       - ./data:/app/data
     depends_on:
@@ -24,6 +25,7 @@ services:
       - RPC_SECRET=my_secret_token
       - RPC_PORT=6800
       - LISTEN_PORT=51413
+      - TZ=Asia/Shanghai  # 设置时区
       # --- 自动更新 Tracker ---
       - UPDATE_TRACKERS=true
       - TRACKERS_LIST_URL=https://trackerslist.com/all_aria2.txt
@@ -50,6 +52,8 @@ services:
   ariang:
     image: p3terx/ariang
     container_name: ariang
+    environment:
+      - TZ=Asia/Shanghai  # 设置时区
     ports:
       - "6880:6880"
     networks:
