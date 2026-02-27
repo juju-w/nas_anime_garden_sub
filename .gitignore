@@ -211,3 +211,6 @@ node_modules/
 dist/
 .DS_Store
 .env
+
+# Local data directory
+data/
